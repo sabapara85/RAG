@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Professional Technical Document Q&A System powered by RAG">
+    <title>RAG Analyzer — Technical Document Q&A v3.14</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f2f5;
+            color: #1a2332;
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        /* ── Top Bar ─────────────────────────────────────────────────── */
+        .topbar {
+            background: #ffffff;
+            border-bottom: 1px solid #dde3ec;
+            padding: 0 24px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .brand { display: flex; align-items: center; gap: 12px; }
+        .logo-box {
+            width: 36px; height: 36px;
+            background: #185FA5;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .logo-box svg { width: 18px; height: 18px; fill: #fff; }
+        .brand-name { font-size: 15px; font-weight: 600; color: #1a2332; }
+        .brand-sub { font-size: 11px; color: #6b7a99; margin-top: 1px; }
+        .status-badge {
+            background: #eaf3de; color: #3b6d11;
+            font-size: 11px; font-weight: 600;
+            padding: 4px 12px; border-radius: 20px;
+            border: 1px solid #c0dd97;
+        }
+
+        /* ── Layout ──────────────────────────────────────────────────── */
+        .layout {
+            display: grid;
+            grid-template-columns: 290px 1fr;
+            gap: 0;
+            min-height: calc(100vh - 60px);
+        }
+        @media (max-width: 960px) {
+            .layout { grid-template-columns: 1fr; }
+        }
+
+        /* ── Sidebar ─────────────────────────────────────────────────── */
+        .sidebar {
+            background: #ffffff;
+            border-right: 1px solid #dde3ec;
+            padding: 20px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+            max-height: calc(100vh - 60px);
+            position: sticky;
+            top: 60px;
+        }
+        .sidebar-section-title {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #6b7a99;
+            margin-bottom: 10px;
+        }
+        .sidebar-block { border-bottom: 1px solid #f0f2f5; padding-bottom: 20px; }
+        .sidebar-block:last-child { border-bottom: none; }
+
+        /* Upload area */
+        .upload-area {
+            border: 1.5px dashed #b5d4f4;
+            border-radius: 8px;
+            padding: 20px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #f7fafd;
+        }
+        .upload-area:hover { border-color: #185FA5; background: #eaf2fb; }
+        .upload-area input[type="file"] { display: none; }
+        .upload-icon { font-size: 24px; margin-bottom: 8px; }
+        .upload-text { font-size: 12px; color: #6b7a99; line-height: 1.5; }
+
+        /* File list */
+        .file-list { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+        .file-item {
+            display: flex; align-items: center; justify-content: space-between;
+            background: #f7fafd;
+            border: 1px solid #dde3ec;
+            border-left: 3px solid #185FA5;
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-size: 12px;
+            color: #1a2332;
+        }
+        .file-item .size { color: #6b7a99; font-size: 11px; }
+
+        /* Form elements */
+        .form-group { margin-bottom: 12px; }
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #3d4f6e;
+            margin-bottom: 5px;
+        }
+        select, input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 8px 10px;
+            background: #ffffff;
+            border: 1px solid #dde3ec;
+            border-radius: 6px;
+            color: #1a2332;
+            font-size: 12px;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+        select:hover, input:hover { border-color: #185FA5; }
+        select:focus, input:focus {
+            outline: none;
+            border-color: #185FA5;
+            box-shadow: 0 0 0 3px rgba(24, 95, 165, 0.1);
+        }
+        .help-text { font-size: 11px; color: #6b7a99; margin-top: 4px; }
+        .help-text a { color: #185FA5; text-decoration: none; }
+        .help-text a:hover { text-decoration: underline; }
+
+        /* Buttons */
+        .button {
+            width: 100%;
+            padding: 9px 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .button:active { transform: scale(0.98); }
+        .button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .button-primary {
+            background: #185FA5;
+            color: #ffffff;
+        }
+        .button-primary:hover:not(:disabled) { background: #0c447c; }
+        .button-secondary {
+            background: #ffffff;
+            color: #185FA5;
+            border: 1px solid #b5d4f4;
+            width: auto;
+            padding: 7px 14px;
+        }
+        .button-secondary:hover:not(:disabled) { background: #eaf2fb; border-color: #185FA5; }
+
+        /* Info box */
+        .info-box {
+            background: #eaf2fb;
+            border: 1px solid #b5d4f4;
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-size: 12px;
+            color: #185FA5;
+            margin-bottom: 14px;
+        }
+
+        /* Config subheading */
+        .config-subheading {
+            font-size: 10px;
+            font-weight: 700;
+            color: #6b7a99;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin: 14px 0 10px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #f0f2f5;
+        }
+
+        /* OR divider */
+        .or-divider {
+            text-align: center;
+            margin: 14px 0;
+            font-size: 11px;
+            color: #9eabc0;
+            font-weight: 600;
+        }
+
+        /* Load DB section */
+        .load-db-section {
+            background: #f0f9f4;
+            border: 1px solid #c0dd97;
+            border-radius: 8px;
+            padding: 8px 12px; 
+            margin-bottom: 10px
+            max-width: 360px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .load-db-title {
+            font-size: 10px;
+            font-weight: 700;
+            color: #3b6d11;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .load-db-description { font-size: 11px; color: #4a7a1e; margin-bottom: 10px; word-break: break-word; }
+        .load-db-input-group { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+
+        /* Progress */
+        .progress-container { margin-top: 12px; display: none; }
+        .progress-bar-bg {
+            background: #e8edf5;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            width: 0%;
+            height: 5px;
+            background: #185FA5;
+            transition: width 0.3s;
+        }
+
+        /* Vector DB Card */
+        .vector-card {
+            margin-top: 16px;
+            background: #eaf2fb;
+            border-radius: 8px;
+            padding: 12px;
+            border: 1px solid #b5d4f4;
+            display: none;
+        }
+        .vector-card-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .vector-count-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a2332;
+        }
+        .vector-health {
+            font-size: 11px;
+            margin-top: 8px;
+            color: #3b6d11;
+        }
+
+        /* ── Main content area ───────────────────────────────────────── */
+        .main-area {
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            gap: 16px;
+            overflow-y: auto;
+            max-height: calc(100vh - 60px);
+        }
+
+        /* Q&A results */
+        .qa-results { display: flex; flex-direction: column; gap: 16px; }
+        .qa-results.hidden { display: none; }
+
+        /* QA Card */
+        .qa-card {
+            background: #ffffff;
+            border-radius: 10px;
+            border: 1px solid #dde3ec;
+            overflow: hidden;
+        }
+
+        /* Question */
+        .question-display {
+            background: #f7fafd;
+            border-bottom: 1px solid #dde3ec;
+            padding: 14px 18px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        .q-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #185FA5;
+            white-space: nowrap;
+            margin-top: 2px;
+            min-width: 28px;
+        }
+        .question-text {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1a2332;
+            line-height: 1.5;
+        }
+
+        /* Answer */
+        .answer-display { padding: 18px 20px; }
+        .answer-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #6b7a99;
+            margin-bottom: 12px;
+        }
+        .answer-text {
+            font-size: 13px;
+            color: #2d3a4f;
+            line-height: 1.75;
+        }
+        .answer-text strong { color: #185FA5; font-weight: 600; }
+
+        /* Answer formatting */
+        .answer-paragraph { margin-bottom: 10px; }
+        .answer-section-header {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: #185FA5;
+            margin-top: 16px;
+            margin-bottom: 8px;
+        }
+        .answer-bullet-list { list-style: none; margin: 6px 0 12px 0; padding: 0; }
+        .answer-bullet-item {
+            position: relative;
+            padding: 5px 0 5px 16px;
+            border-left: 2px solid #b5d4f4;
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: #2d3a4f;
+            line-height: 1.6;
+        }
+        .answer-bullet-item::before {
+            content: '';
+            position: absolute;
+            left: -4px;
+            top: 13px;
+            width: 6px;
+            height: 6px;
+            background: #185FA5;
+            border-radius: 50%;
+        }
+        .answer-numbered-item {
+            padding: 5px 0 5px 12px;
+            border-left: 2px solid #185FA5;
+            margin-bottom: 7px;
+            font-size: 13px;
+            color: #2d3a4f;
+            line-height: 1.6;
+        }
+
+        /* Conclusion box */
+        .conclusion-box {
+            background: #f7fafd;
+            border-radius: 6px;
+            border-left: 3px solid #185FA5;
+            padding: 12px 14px;
+            margin: 14px 0;
+        }
+        .conclusion-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #185FA5;
+            margin-bottom: 6px;
+        }
+        .conclusion-text { font-size: 13px; color: #2d3a4f; line-height: 1.65; }
+
+        /* Meta row — confidence + sources */
+        .meta-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding-top: 14px;
+            margin-top: 14px;
+            border-top: 1px solid #f0f2f5;
+            flex-wrap: wrap;
+        }
+        .confidence { display: flex; align-items: center; gap: 7px; }
+        .conf-label { font-size: 11px; color: #6b7a99; }
+        .conf-dots { display: flex; gap: 3px; }
+        .conf-dot { width: 8px; height: 8px; border-radius: 50%; background: #3b6d11; }
+        .conf-dot.empty { background: #dde3ec; }
+        .conf-score { font-size: 11px; font-weight: 600; color: #3b6d11; }
+
+        /* Sources section */
+        .sources-section {
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid #f0f2f5;
+        }
+        .sources-header {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: #6b7a99;
+            margin-bottom: 8px;
+        }
+        .source-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f7fafd;
+            border: 1px solid #dde3ec;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-bottom: 5px;
+            font-size: 12px;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .source-name { color: #2d3a4f; font-weight: 500; }
+        .source-relevance {
+            background: #eaf2fb;
+            color: #185FA5;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* Section divider between Q&A pairs */
+        .section-divider { height: 1px; background: #f0f2f5; margin: 4px 0; }
+
+        /* Query input area */
+        .query-panel {
+            background: #ffffff;
+            border-radius: 10px;
+            border: 1px solid #dde3ec;
+            padding: 16px 18px;
+            margin-top: auto;
+        }
+        .query-input-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: #6b7a99;
+            margin-bottom: 10px;
+        }
+        .query-input { display: flex; gap: 10px; flex-wrap: wrap; }
+        .query-input input[type="text"] {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 14px;
+            font-size: 13px;
+            border: 1px solid #dde3ec;
+            border-radius: 6px;
+            background: #f7fafd;
+            color: #1a2332;
+        }
+        .query-input input[type="text"]:focus {
+            background: #fff;
+            border-color: #185FA5;
+            box-shadow: 0 0 0 3px rgba(24,95,165,0.08);
+        }
+        .query-input button { width: auto; padding: 10px 22px; font-size: 13px; }
+
+        .action-buttons { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+        .action-buttons.hidden { display: none; }
+
+        /* Loading animation */
+        .loading-flower { display: inline-flex; gap: 5px; align-items: center; margin-left: 8px; }
+        .flower-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: #fff;
+            animation: flowerBounce 1.4s infinite;
+        }
+        .flower-dot:nth-child(1) { animation-delay: 0s; }
+        .flower-dot:nth-child(2) { animation-delay: 0.2s; }
+        .flower-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes flowerBounce {
+            0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+            40% { opacity: 1; transform: scale(1.2); }
+        }
+
+        *:focus { outline: 2px solid #185FA5; outline-offset: 2px; }
+        button:focus, input:focus, select:focus {
+            box-shadow: 0 0 0 3px rgba(24, 95, 165, 0.12);
+        }
+
+        .skip-link {
+            position: absolute; top: -40px; left: 0;
+            background: #185FA5; color: white;
+            padding: 8px 16px; text-decoration: none;
+            border-radius: 0 0 4px 0;
+        }
+        .skip-link:focus { top: 0; }
+
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #f0f2f5; }
+        ::-webkit-scrollbar-thumb { background: #b5d4f4; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #185FA5; }
+
+        .footer {
+            background: #ffffff;
+            border-top: 1px solid #dde3ec;
+            text-align: center;
+            padding: 14px 24px;
+            font-size: 11px;
+            color: #9eabc0;
+        }
+
+        @media (max-width: 480px) {
+            .query-input { flex-direction: column; }
+            .query-input button { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <header class="topbar">
+        <div class="brand">
+            <div class="logo-box" aria-hidden="true">
+                <svg viewBox="0 0 20 20"><path d="M3 3h6v6H3zM11 3h6v6h-6zM3 11h6v6H3zM11 11h6v6h-6z"/></svg>
+            </div>
+            <div>
+                <div class="brand-name">RAG Document Analyzer</div>
+                <div class="brand-sub">Engineering Intelligence Platform · v3.14</div>
+            </div>
+        </div>
+        <div class="status-badge">Mistral &amp; OpenAI Ready</div>
+    </header>
+
+    <div class="layout">
+        <aside class="sidebar">
+            <!-- Upload Documents -->
+            <div class="sidebar-block">
+                <div class="sidebar-section-title">Documents</div>
+                <div class="upload-area" id="uploadArea" tabindex="0" aria-label="Upload PDF files">
+                    <div class="upload-icon">📑</div>
+                    <div class="upload-text">Click or drag PDF files here</div>
+                    <input type="file" id="fileInput" multiple accept=".pdf" />
+                </div>
+                <div class="file-list" id="fileList" aria-live="polite"></div>
+            </div>
+
+            <!-- Embedding Configuration -->
+            <div class="sidebar-block">
+                <div class="sidebar-section-title">Embedding</div>
+                <div class="info-box">Select provider and enter API key before processing</div>
+                <div class="form-group">
+                    <label for="embeddingProvider">Provider</label>
+                    <select id="embeddingProvider" onchange="updateEmbeddingModels()">
+                        <option value="mistral">Mistral (Recommended)</option>
+                        <option value="openai">OpenAI</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="embeddingModel">Model</label>
+                    <select id="embeddingModel">
+                        <option value="mistral-embed">mistral-embed (Default)</option>
+                    </select>
+                    <div class="help-text">Converts documents to searchable vectors</div>
+                </div>
+                <div class="form-group">
+                    <label for="embeddingKey">API Key</label>
+                    <input type="password" id="embeddingKey" placeholder="sk-..." />
+                    <div class="help-text">Get from: <a href="https://console.mistral.ai/" target="_blank">mistral.ai</a></div>
+                </div>
+                <button class="button button-primary" onclick="processDocuments()" id="processBtn">⚡ Process &amp; Embed</button>
+
+                <!-- Progress -->
+                <div class="progress-container" id="progressContainer">
+                    <div style="background:#f0f2f5;border-radius:6px;padding:10px;margin-top:8px;">
+                        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                            <span id="progressStage" style="color:#3d4f6e;font-size:12px;">Processing...</span>
+                            <span id="progressPercent" style="color:#185FA5;font-size:12px;font-weight:700;">0%</span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" id="progressBar"></div>
+                        </div>
+                        <div id="progressMessage" style="margin-top:5px;color:#6b7a99;font-size:11px;"></div>
+                    </div>
+                </div>
+
+                <div class="or-divider">─── OR ───</div>
+
+                <!-- Load DB -->
+                <div class="load-db-section">
+                    <div class="load-db-title">📂 Load Previous Database</div>
+                    <div class="load-db-description">Load your saved vectorstore ZIP to continue without re-processing.</div>
+                    <div class="load-db-input-group">
+                        <input type="file" id="vectorstoreInput" accept=".zip"
+                            style="flex:1;padding:8px 10px;background:#fff;border:1px solid #c0dd97;border-radius:6px;color:#1a2332;font-size:12px;" />
+                        <button class="button button-primary" onclick="loadVectorstore()" style="width:auto;padding:8px 14px;">📂 Load DB</button>
+                    </div>
+                    <div id="fileStatus" style="margin-top:8px;color:#3b6d11;font-size:12px;"></div>
+                    <div class="help-text">Upload the .zip file from "Download DB"</div>
+                </div>
+            </div>
+
+            <!-- Vector Database Card (appears when vectors exist) -->
+            <div id="vectorDbCard" class="vector-card">
+                <div class="vector-card-row">
+                    <div>
+                        <div style="font-size: 11px; font-weight: 700; color: #185FA5;">📦 Vector Database</div>
+                        <div id="vectorCountValue" class="vector-count-value">0</div>
+                        <div style="font-size: 11px; color: #6b7a99;">vectors ready for query</div>
+                    </div>
+                    <button class="button button-secondary" onclick="downloadVectorstore()" style="width: auto; padding: 6px 12px;">💾 Download DB</button>
+                </div>
+                <div id="vectorHealth" class="vector-health"></div>
+            </div>
+
+            <!-- LLM Configuration -->
+            <div class="sidebar-block">
+                <div class="sidebar-section-title">LLM Configuration</div>
+                <div class="form-group">
+                    <label for="llmProvider">Provider</label>
+                    <select id="llmProvider" onchange="updateLLMModels()">
+                        <option value="deepseek">DeepSeek (Recommended)</option>
+                        <option value="openai">OpenAI (Premium)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="llmModel">Model</label>
+                    <select id="llmModel">
+                        <option value="deepseek-chat">deepseek-chat ⭐</option>
+                        <option value="deepseek-reasoner">deepseek-reasoner</option>
+                        <option value="deepseek-coder">deepseek-coder</option>
+                    </select>
+                    <div class="help-text">For generating answers from documents</div>
+                </div>
+                <div class="form-group">
+                    <label for="llmKey">API Key</label>
+                    <input type="password" id="llmKey" placeholder="sk-..." />
+                    <div class="help-text">Get from: <a href="https://platform.deepseek.com/" target="_blank">deepseek.com</a></div>
+                </div>
+            </div>
+        </aside>
+
+        <main id="main-content" class="main-area">
+            <div class="qa-results hidden" id="qaResults" aria-live="polite"></div>
+            <div class="query-panel">
+                <label class="query-input-label" for="queryInput">Ask a question about your documents</label>
+                <div class="info-box" style="margin-bottom:12px;">
+                    Each question uses previous answers as context for accurate follow-ups
+                </div>
+                <div class="query-input">
+                    <input type="text" id="queryInput"
+                        placeholder="e.g. When RF pad cannot be used?"
+                        onkeypress="if(event.key==='Enter') queryDocuments()" />
+                    <button class="button button-primary" onclick="queryDocuments()" id="submitBtn">Submit</button>
+                </div>
+                <div class="action-buttons hidden" id="actionButtons">
+                    <button class="button button-secondary" onclick="exportChat()">📥 Export Chat</button>
+                    <button class="button button-secondary" onclick="downloadVectorstore()">💾 Download DB</button>
+                    <button class="button button-secondary" onclick="clearSession()">🗑️ Clear</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <footer class="footer">
+        <p>© 2026 Viral Patel · RAG Document Analyzer v3.14 · Engineering Intelligence Platform</p>
+    </footer>
+
+    <script>
+        let sessionId = null;
+        let uploadedFiles = [];
+        let qaHistory = [];
+        let progressInterval = null;
+
+        // ==================== Helper Functions ====================
+        function escapeHtml(text) {
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        function showSuccess(message) { console.log('✅', message); }
+        function showError(message) { console.error('❌', message); alert(message); }
+
+        // ==================== API Functions ====================
+        async function initSession() {
+            try {
+                const response = await fetch('/api/init-session', { method: 'POST' });
+                const data = await response.json();
+                sessionId = data.session_id;
+                console.log('Session initialized:', sessionId);
+                await refreshVectorStatus(); // initial check
+                // Start periodic polling every 5 seconds to catch partial progress
+                setInterval(refreshVectorStatus, 5000);
+            } catch (error) {
+                console.error('Error initializing session:', error);
+                showError('Error initializing session');
+            }
+        }
+
+        async function refreshVectorStatus() {
+            if (!sessionId) return;
+            try {
+                const res = await fetch('/api/verify-index', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+                const data = await res.json();
+                const card = document.getElementById('vectorDbCard');
+                if (data.total_vectors > 0) {
+                    card.style.display = 'block';
+                    document.getElementById('vectorCountValue').innerText = data.total_vectors;
+                    const healthMsg = data.index_healthy ? '✅ Index healthy' : '⚠️ ' + (data.warning || 'Index may be incomplete');
+                    document.getElementById('vectorHealth').innerHTML = healthMsg;
+                    // Also show action buttons for convenience
+                    document.getElementById('actionButtons').classList.remove('hidden');
+                } else {
+                    card.style.display = 'none';
+                    document.getElementById('actionButtons').classList.add('hidden');
+                }
+            } catch(e) { console.warn('Status poll error:', e); }
+        }
+
+        function updateLLMModels() {
+            const provider = document.getElementById('llmProvider').value;
+            const modelSelect = document.getElementById('llmModel');
+            modelSelect.innerHTML = '';
+            if (provider === 'deepseek') {
+                modelSelect.innerHTML = `
+                    <option value="deepseek-chat">deepseek-chat - Fast & Cheap (⭐ Recommended)</option>
+                    <option value="deepseek-reasoner">deepseek-reasoner - Advanced Reasoning</option>
+                    <option value="deepseek-coder">deepseek-coder - Code Specialist</option>
+                `;
+            } else {
+                modelSelect.innerHTML = `
+                    <option value="gpt-4o">gpt-4o - Best Quality</option>
+                    <option value="gpt-4o-mini">gpt-4o-mini - Best Value (⭐ Recommended)</option>
+                    <option value="gpt-4-turbo">gpt-4-turbo - Very Good</option>
+                    <option value="gpt-3.5-turbo">gpt-3.5-turbo - Budget Option</option>
+                `;
+            }
+        }
+
+        function updateEmbeddingModels() {
+            const provider = document.getElementById('embeddingProvider').value;
+            const modelSelect = document.getElementById('embeddingModel');
+            modelSelect.innerHTML = '';
+            if (provider === 'mistral') {
+                modelSelect.innerHTML = `<option value="mistral-embed">mistral-embed (Only option)</option>`;
+            } else {
+                modelSelect.innerHTML = `
+                    <option value="text-embedding-3-small">text-embedding-3-small (Budget)</option>
+                    <option value="text-embedding-3-large">text-embedding-3-large (Quality)</option>
+                `;
+            }
+        }
+
+        // ==================== File Upload ====================
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#185FA5';
+            uploadArea.style.background = '#eaf2fb';
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.style.borderColor = '#b5d4f4';
+            uploadArea.style.background = '#f7fafd';
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#b5d4f4';
+            uploadArea.style.background = '#f7fafd';
+            handleFiles(e.dataTransfer.files);
+        });
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        async function handleFiles(files) {
+            const formData = new FormData();
+            formData.append('session_id', sessionId);
+            for (let file of files) formData.append('files', file);
+            try {
+                const response = await fetch('/api/upload', { method: 'POST', body: formData });
+                const data = await response.json();
+                if (data.success) {
+                    uploadedFiles = data.files;
+                    displayFiles();
+                    showSuccess(`Uploaded ${data.files.length} file(s)`);
+                } else {
+                    showError(`Error: ${data.error}`);
+                }
+            } catch (error) {
+                showError(`Upload error: ${error.message}`);
+            }
+        }
+
+        function displayFiles() {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = uploadedFiles.map(file => `
+                <div class="file-item">
+                    <span>📄 ${escapeHtml(file.filename)}</span>
+                    <span class="size">${(file.size / 1024).toFixed(1)} KB</span>
+                </div>
+            `).join('');
+        }
+
+        // ==================== Process Documents ====================
+        async function processDocuments() {
+            const embeddingProvider = document.getElementById('embeddingProvider').value;
+            const embeddingModel = document.getElementById('embeddingModel').value;
+            const embeddingKey = document.getElementById('embeddingKey').value;
+
+            if (!embeddingKey) { showError('Please enter Embedding API Key'); return; }
+            if (uploadedFiles.length === 0) { showError('Please upload at least one PDF'); return; }
+
+            const btn = document.getElementById('processBtn');
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Processing...';
+
+            const progressContainer = document.getElementById('progressContainer');
+            progressContainer.style.display = 'block';
+            const progressBar = document.getElementById('progressBar');
+            const progressStage = document.getElementById('progressStage');
+            const progressPercent = document.getElementById('progressPercent');
+            const progressMessage = document.getElementById('progressMessage');
+
+            if (progressInterval) clearInterval(progressInterval);
+            progressInterval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/progress/${sessionId}`);
+                    const data = await res.json();
+                    if (data.stage === 'extracting' || data.stage === 'embedding') {
+                        const percent = data.total > 0 ? (data.current / data.total * 100).toFixed(1) : 0;
+                        progressBar.style.width = `${percent}%`;
+                        progressPercent.textContent = `${percent}%`;
+                        progressStage.textContent = data.stage === 'extracting' ? '📄 Extracting text' : '🧠 Generating embeddings';
+                        progressMessage.textContent = data.message;
+                    } else if (data.stage === 'completed') {
+                        progressBar.style.width = '100%';
+                        progressPercent.textContent = '100%';
+                        progressStage.textContent = '✅ Complete';
+                        progressMessage.textContent = data.message;
+                        setTimeout(() => {
+                            if (progressInterval) clearInterval(progressInterval);
+                            progressInterval = null;
+                            progressContainer.style.display = 'none';
+                        }, 3000);
+                    } else if (data.stage === 'error') {
+                        progressStage.textContent = '❌ Error';
+                        progressMessage.textContent = data.message;
+                        progressBar.style.backgroundColor = '#e24b4a';
+                        if (progressInterval) clearInterval(progressInterval);
+                        progressInterval = null;
+                    }
+                    // Also refresh vector count during processing
+                    await refreshVectorStatus();
+                } catch (err) { console.warn('Progress poll error:', err); }
+            }, 500);
+
+            try {
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        embedding_provider: embeddingProvider,
+                        embedding_model: embeddingModel,
+                        embedding_key: embeddingKey
+                    })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showSuccess(`Processed ${data.chunks_created} chunks (${data.successful_embeds} embedded)`);
+                    await refreshVectorStatus();
+                } else {
+                    showError(`Error: ${data.error}`);
+                }
+            } catch (error) {
+                showError(`Processing error: ${error.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '⚡ Process &amp; Embed';
+                setTimeout(() => {
+                    if (progressInterval) clearInterval(progressInterval);
+                    progressInterval = null;
+                    progressContainer.style.display = 'none';
+                }, 5000);
+                await refreshVectorStatus(); // final check
+            }
+        }
+
+        // ==================== Load Vectorstore ====================
+        async function loadVectorstore() {
+            const fileInput = document.getElementById('vectorstoreInput');
+            const fileStatus = document.getElementById('fileStatus');
+            if (!fileInput.files || fileInput.files.length === 0) {
+                fileStatus.textContent = '❌ Please select a vectorstore ZIP file';
+                return;
+            }
+            const file = fileInput.files[0];
+            if (!file.name.endsWith('.zip')) {
+                fileStatus.textContent = '❌ Please select a valid .zip file';
+                return;
+            }
+            const formData = new FormData();
+            formData.append('session_id', sessionId);
+            formData.append('file', file);
+            const loadBtn = document.querySelector('button[onclick="loadVectorstore()"]');
+            const originalText = loadBtn.innerHTML;
+            loadBtn.disabled = true;
+            loadBtn.innerHTML = '⏳ Loading...';
+            fileStatus.textContent = '⏳ Loading vectorstore...';
+            try {
+                const response = await fetch('/api/load-vectorstore', { method: 'POST', body: formData });
+                const data = await response.json();
+                if (data.success) {
+                    fileStatus.textContent = '✅ Vectorstore loaded successfully!';
+                    fileInput.value = '';
+                    await refreshVectorStatus();
+                    showSuccess('Vectorstore loaded successfully!');
+                } else {
+                    throw new Error(data.error || 'Failed to load');
+                }
+            } catch (error) {
+                fileStatus.textContent = `❌ Error: ${error.message}`;
+                showError(`Load error: ${error.message}`);
+            } finally {
+                loadBtn.disabled = false;
+                loadBtn.innerHTML = originalText;
+            }
+        }
+
+        // ==================== Download Vectorstore ====================
+        async function downloadVectorstore() {
+            try {
+                const response = await fetch('/api/download-vectorstore', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'vectorstore.zip';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                showSuccess('Vectorstore downloaded');
+            } catch (error) {
+                showError(`Download error: ${error.message}`);
+                console.error(error);
+            }
+        }
+
+        // ==================== Query ====================
+        async function queryDocuments() {
+            const query = document.getElementById('queryInput').value.trim();
+            const llmProvider = document.getElementById('llmProvider').value;
+            const llmModel = document.getElementById('llmModel').value;
+            const llmKey = document.getElementById('llmKey').value;
+            const embeddingProvider = document.getElementById('embeddingProvider').value;
+            const embeddingModel = document.getElementById('embeddingModel').value;
+            const embeddingKey = document.getElementById('embeddingKey').value;
+
+            if (!query) { showError('Please enter a question'); return; }
+            if (!llmKey) { showError('Please enter LLM API Key'); return; }
+
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = 'Thinking<div class="loading-flower"><div class="flower-dot"></div><div class="flower-dot"></div><div class="flower-dot"></div></div>';
+
+            try {
+                const response = await fetch('/api/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        query: query,
+                        llm_provider: llmProvider,
+                        llm_model: llmModel,
+                        llm_key: llmKey,
+                        embedding_provider: embeddingProvider,
+                        embedding_model: embeddingModel,
+                        embedding_key: embeddingKey
+                    })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    qaHistory.push({ question: query, answer: data.response, sources: data.sources || [] });
+                    displayQAResults();
+                    document.getElementById('queryInput').value = '';
+                    document.getElementById('actionButtons').classList.remove('hidden');
+                } else {
+                    showError(`Error: ${data.error}`);
+                }
+            } catch (error) {
+                showError(`Query error: ${error.message}`);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit';
+            }
+        }
+
+        function displayQAResults() {
+            const qaResults = document.getElementById('qaResults');
+            if (qaHistory.length === 0) {
+                qaResults.classList.add('hidden');
+                return;
+            }
+            qaResults.classList.remove('hidden');
+            qaResults.innerHTML = qaHistory.map((qa, index) => `
+                <div class="qa-card">
+                    <div class="question-display">
+                        <span class="q-label">Q${index + 1}</span>
+                        <div class="question-text">${escapeHtml(qa.question)}</div>
+                    </div>
+                    <div class="answer-display">
+                        <div class="answer-label">Answer</div>
+                        <div class="answer-text">${formatAnswer(qa.answer)}</div>
+                        ${qa.sources && qa.sources.length > 0 ? `
+                            <div class="sources-section">
+                                <div class="sources-header">📑 Sources</div>
+                                ${qa.sources.map((source, i) => `
+                                    <div class="source-item">
+                                        <div class="source-name">${escapeHtml(source)}</div>
+                                        <span class="source-relevance">Source ${i + 1}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('<div class="section-divider"></div>');
+            qaResults.scrollTop = qaResults.scrollHeight;
+        }
+
+        function formatAnswer(text) {
+            const escMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            text = text.replace(/[&<>"']/g, m => escMap[m]);
+
+            text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            text = text.replace(/\*/g, '');
+
+            const lines = text.split('\n');
+            let html = '';
+            let inBulletList = false;
+            let inConclusionBlock = false;
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+
+                if (!line) {
+                    if (inBulletList) { html += '</ul>'; inBulletList = false; }
+                    if (inConclusionBlock) { html += '</div>'; inConclusionBlock = false; }
+                    continue;
+                }
+
+                if (/^(CONCLUSION)$/i.test(line)) {
+                    if (inBulletList) { html += '</ul>'; inBulletList = false; }
+                    if (inConclusionBlock) { html += '</div>'; inConclusionBlock = false; }
+                    html += '<div class="conclusion-box"><div class="conclusion-label">Conclusion</div><div class="conclusion-text">';
+                    inConclusionBlock = true;
+                    continue;
+                }
+                if (/^(Answer|ANSWER)$/.test(line)) {
+                    if (inBulletList) { html += '</ul>'; inBulletList = false; }
+                    html += '<div class="answer-section-header">Answer</div>';
+                    continue;
+                }
+                if (/^CONFIDENCE:\s*\d/.test(line)) {
+                    if (inBulletList) { html += '</ul>'; inBulletList = false; }
+                    if (inConclusionBlock) { html += '</div></div>'; inConclusionBlock = false; }
+                    html += `<div class="answer-section-header">${line}</div>`;
+                    continue;
+                }
+                if (/^SOURCES$/.test(line)) {
+                    if (inBulletList) { html += '</ul>'; inBulletList = false; }
+                    html += '<div class="answer-section-header">Sources</div>';
+                    continue;
+                }
+
+                if (/^[•\-]\s+/.test(line)) {
+                    if (inConclusionBlock) { html += '</div></div>'; inConclusionBlock = false; }
+                    if (!inBulletList) { html += '<ul class="answer-bullet-list">'; inBulletList = true; }
+                    const content = line.replace(/^[•\-]\s+/, '');
+                    html += `<li class="answer-bullet-item">${content}</li>`;
+                    continue;
+                }
+
+                if (/^\d+\.\s+/.test(line)) {
+                    if (inBulletList) { html += '</ul>'; inBulletList = false; }
+                    if (inConclusionBlock) { html += '</div></div>'; inConclusionBlock = false; }
+                    const content = line.replace(/^\d+\.\s+/, '');
+                    html += `<div class="answer-numbered-item">${content}</div>`;
+                    continue;
+                }
+
+                if (inConclusionBlock) {
+                    html += line + ' ';
+                } else {
+                    if (inBulletList) { html += '</ul>'; inBulletList = false; }
+                    html += `<div class="answer-paragraph">${line}</div>`;
+                }
+            }
+
+            if (inBulletList) html += '</ul>';
+            if (inConclusionBlock) html += '</div></div>';
+            return html;
+        }
+
+        // ==================== Export / Clear ====================
+        async function exportChat() {
+            try {
+                const response = await fetch('/api/export-chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'chat_history.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                showSuccess('Chat exported');
+            } catch (error) {
+                showError(`Export error: ${error.message}`);
+            }
+        }
+
+        async function clearSession() {
+            if (!confirm('Clear all session data? This cannot be undone.')) return;
+            try {
+                await fetch('/api/clear-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+                qaHistory = [];
+                uploadedFiles = [];
+                document.getElementById('queryInput').value = '';
+                document.getElementById('qaResults').classList.add('hidden');
+                document.getElementById('fileList').innerHTML = '';
+                await refreshVectorStatus(); // will hide card because vectors are gone
+                showSuccess('Session cleared');
+            } catch (error) {
+                showError(`Clear error: ${error.message}`);
+            }
+        }
+
+        window.addEventListener('load', () => {
+            initSession();
+            updateEmbeddingModels();
+            updateLLMModels();
+        });
+    </script>
+</body>
+</html>
